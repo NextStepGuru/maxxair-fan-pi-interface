@@ -1,0 +1,13 @@
+{
+  "target": 72.0,
+  "direction": "in",
+  "steps": [
+    { "temp": 72.0 },
+    { "temp": 72.0 },
+    { "temp": 71.99 },
+    { "temp": 71.98 }
+  ],
+  "expected_ir": [
+    "fan_off.ir"
+  ]
+}
