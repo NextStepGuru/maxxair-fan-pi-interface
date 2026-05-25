@@ -1,0 +1,19 @@
+{
+  "fans": [
+    {
+      "id": "fan1",
+      "firebase_node": "fans/fan1",
+      "agent_url": "http://pi1.local:8765"
+    },
+    {
+      "id": "fan2",
+      "firebase_node": "fans/fan2",
+      "agent_url": "http://pi2.local:8765"
+    },
+    {
+      "id": "fan3",
+      "firebase_node": "fans/fan3",
+      "agent_url": "http://pi3.local:8765"
+    }
+  ]
+}

@@ -50,6 +50,22 @@ Checks Firebase connectivity, sensor path, IR directory, and `ir-ctl`. Exits `0`
 
 Run this after [Quickstart](quickstart.md) configuration and before enabling systemd.
 
+## agent
+
+Run the edge HTTP agent on a remote Pi (sensor + IR access for hub topology).
+
+```bash
+maxxair-fan agent
+maxxair-fan agent --bind 0.0.0.0 --port 8765
+```
+
+| Flag | Description |
+| --- | --- |
+| `--bind` | Bind address (default from `AGENT_BIND`) |
+| `--port` | Listen port (default from `AGENT_PORT`) |
+
+See [Topologies](topologies.md) for hub + remote Pi deployment.
+
 ## send-ir
 
 Send a single IR code file (uses configured `IR_BACKEND`).

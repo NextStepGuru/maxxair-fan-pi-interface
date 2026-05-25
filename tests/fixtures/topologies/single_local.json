@@ -1,0 +1,9 @@
+{
+  "fans": [
+    {
+      "id": "fan1",
+      "firebase_node": "fans/fan1",
+      "local": {}
+    }
+  ]
+}

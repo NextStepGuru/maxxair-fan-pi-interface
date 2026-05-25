@@ -13,6 +13,7 @@ Guides for installing, configuring, and developing the MaxxAir Fan Pi Interface.
 | [Firebase schema](firebase-schema.md) | RTDB fields, example document, and security rules |
 | [Troubleshooting](troubleshooting.md) | Common problems and how to fix them |
 | [Development](development.md) | Run locally without Pi hardware, replay fixtures, fake Firebase |
+| [Topologies](topologies.md) | Multi-fan deployments: single Pi, hub + remote, multi-local |
 
 ## Other resources
 

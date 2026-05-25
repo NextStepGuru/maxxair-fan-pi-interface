@@ -1,0 +1,19 @@
+{
+  "fans": [
+    {
+      "id": "fan1",
+      "firebase_node": "fans/fan1",
+      "agent_url": "http://127.0.0.1:9001"
+    },
+    {
+      "id": "fan2",
+      "firebase_node": "fans/fan2",
+      "agent_url": "http://127.0.0.1:9002"
+    },
+    {
+      "id": "fan3",
+      "firebase_node": "fans/fan3",
+      "agent_url": "http://127.0.0.1:9003"
+    }
+  ]
+}

@@ -5,14 +5,17 @@ from pathlib import Path
 
 from maxxair_fan import config, fan
 from maxxair_fan import main as app_main
+from maxxair_fan.agent import run_agent
 from maxxair_fan.backends import (
     FakeIRBackend,
     FakeSensorBackend,
     InMemoryFirebaseBackend,
     build_backends,
+    load_fan_units,
 )
 from maxxair_fan.devtools.replay import load_expected_ir, run_replay_fixture
 from maxxair_fan.devtools.tui import LiveTUI, format_iteration_state
+from maxxair_fan.fans_config import load_fans_config
 
 
 def _simulator_backends() -> tuple[FakeSensorBackend, FakeIRBackend, InMemoryFirebaseBackend]:
@@ -60,13 +63,25 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_check(_args: argparse.Namespace) -> int:
     _, _, fb_be = build_backends()
-    errors = app_main.validate_runtime(fb_be)
+    try:
+        fan_units = load_fan_units()
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 1
+
+    errors = app_main.validate_runtime(fb_be, fan_units)
     if errors:
         for error in errors:
             print(f"FAIL: {error}", file=sys.stderr)
         return 1
 
-    print("OK: runtime preflight passed")
+    print(f"OK: runtime preflight passed ({len(fan_units)} fan(s))")
+    return 0
+
+
+def cmd_agent(args: argparse.Namespace) -> int:
+    config.configure_logging()
+    run_agent(bind=args.bind, port=args.port)
     return 0
 
 
@@ -135,11 +150,39 @@ def cmd_dump_state(_args: argparse.Namespace) -> int:
     print(f"  IR_BACKEND={config.IR_BACKEND or '(default)'}")
     print(f"  FIREBASE_BACKEND={config.FIREBASE_BACKEND or '(default)'}")
     print(f"  FIREBASE_URL={config.FIREBASE_URL or '(unset)'}")
+    print(f"  FANS_CONFIG={config.FANS_CONFIG or '(legacy single-fan env)'}")
     print(f"  FAN_NODE={config.FAN_NODE}")
     print(f"  IR_DIR={config.IR_DIR}")
+    print(f"  IR_DEVICE={config.IR_DEVICE or '(default)'}")
     print(f"  SENSOR_PATH={config.SENSOR_PATH_OVERRIDE or '(auto-detect)'}")
     print(f"  LOCK_FILE={config.LOCK_FILE}")
     print(f"  CHECK_INTERVAL={config.CHECK_INTERVAL}")
+    print(f"  AGENT_BIND={config.AGENT_BIND}")
+    print(f"  AGENT_PORT={config.AGENT_PORT}")
+    print(f"  AGENT_TOKEN={'(set)' if config.AGENT_TOKEN else '(unset)'}")
+
+    try:
+        specs = load_fans_config()
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"  Fan registry error: {exc}")
+        specs = []
+
+    if specs:
+        print(f"  Fans ({len(specs)}):")
+        for spec in specs:
+            if spec.is_local:
+                local = spec.local
+                sensor_path = local.sensor_path if local else None
+                ir_device = local.ir_device if local else None
+                print(
+                    f"    - {spec.id}: local firebase={spec.firebase_node} "
+                    f"sensor={sensor_path or '(auto)'} ir={ir_device or '(default)'}"
+                )
+            else:
+                print(
+                    f"    - {spec.id}: remote firebase={spec.firebase_node} "
+                    f"agent={spec.agent_url}"
+                )
 
     if config.IR_DIR.exists():
         ir_files = sorted(p.name for p in config.IR_DIR.glob("*.ir"))
@@ -179,6 +222,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     check_parser = sub.add_parser("check", help="Validate Pi runtime preflight checks")
     check_parser.set_defaults(func=cmd_check)
+
+    agent_parser = sub.add_parser("agent", help="Run edge HTTP agent for remote Pi hardware")
+    agent_parser.add_argument(
+        "--bind",
+        default=config.AGENT_BIND,
+        help=f"Bind address (default: {config.AGENT_BIND})",
+    )
+    agent_parser.add_argument(
+        "--port",
+        type=int,
+        default=config.AGENT_PORT,
+        help=f"Listen port (default: {config.AGENT_PORT})",
+    )
+    agent_parser.set_defaults(func=cmd_agent)
 
     send_parser = sub.add_parser("send-ir", help="Send a single IR code file")
     send_parser.add_argument("filename", help="IR filename, e.g. fan_on_in_50.ir")

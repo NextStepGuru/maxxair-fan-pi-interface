@@ -17,13 +17,15 @@ How the MaxxAir Fan Pi Interface reads temperature, syncs with Firebase, and con
                         1-wire          + .ir files     fake backends)
 ```
 
-The daemon runs a loop every `CHECK_INTERVAL` seconds (default 2):
+The daemon runs a loop every `CHECK_INTERVAL` seconds (default 2). Each tick iterates all configured fans (from `FANS_CONFIG` or legacy single-fan env):
 
-1. **Read** `targetTemp` and `direction` from Firebase
-2. **Read** current temperature from the DS18B20 sensor
+1. **Read** `targetTemp` and `direction` from Firebase (per fan node)
+2. **Read** current temperature from sensor (local or remote agent)
 3. **Compute** fan speed (0–100% in 10% steps) using the exponential curve
 4. **Send** the matching pre-recorded IR code (skipped if unchanged)
 5. **Write** status telemetry back to Firebase
+
+Multi-fan deployments: [Topologies](topologies.md).
 
 ## Control loop
 

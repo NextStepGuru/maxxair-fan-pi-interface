@@ -19,6 +19,9 @@ IR_DIR = Path(os.environ.get("IR_DIR", str(REPO_ROOT / "ir_codes")))
 
 FAN_NODE = os.environ.get("FAN_NODE", "fans/fan1")
 
+FANS_CONFIG = os.environ.get("FANS_CONFIG")
+IR_DEVICE = os.environ.get("IR_DEVICE")
+
 SENSOR_PATH_OVERRIDE = os.environ.get("SENSOR_PATH")
 
 FIREBASE_URL = os.environ.get("FIREBASE_URL", "")
@@ -49,6 +52,10 @@ MAXXAIR_SKIP_PREFLIGHT = os.environ.get("MAXXAIR_SKIP_PREFLIGHT", "false").lower
     "true",
     "yes",
 )
+
+AGENT_PORT = int(os.environ.get("AGENT_PORT", "8765"))
+AGENT_BIND = os.environ.get("AGENT_BIND", "127.0.0.1")
+AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "")
 
 
 def configure_logging() -> None:

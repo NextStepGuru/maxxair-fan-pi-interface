@@ -17,16 +17,22 @@ def resolve_ir_filename(direction: str, speed: int) -> str:
     return f"fan_on_in_{speed}.ir"
 
 
-def send_ir(filename: str) -> bool:
+def send_ir(filename: str, ir_device: str | None = None) -> bool:
     """Send IR signal file with ir-ctl. Returns True on success."""
     ir_path = config.IR_DIR / filename
     if not ir_path.exists():
         logger.error("IR file not found: %s", ir_path)
         return False
 
+    cmd = ["ir-ctl"]
+    device = ir_device or config.IR_DEVICE
+    if device:
+        cmd.extend(["-d", device])
+    cmd.extend(["-s", str(ir_path)])
+
     try:
         subprocess.run(
-            ["ir-ctl", "-s", str(ir_path)],
+            cmd,
             check=True,
             timeout=5,
         )

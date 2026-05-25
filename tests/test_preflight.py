@@ -52,6 +52,30 @@ def test_validate_runtime_missing_ir_ctl(monkeypatch, mocker):
     assert any("ir-ctl" in error for error in errors)
 
 
+def test_validate_runtime_remote_agent_failure(monkeypatch, mocker):
+    monkeypatch.setattr(config, "MAXXAIR_BACKEND", "pi")
+    monkeypatch.setattr(config, "MAXXAIR_SKIP_PREFLIGHT", False)
+    monkeypatch.setattr(config, "FIREBASE_BACKEND", "memory")
+    monkeypatch.setattr(config, "FIREBASE_URL", "http://example.test")
+    monkeypatch.setattr(config, "IR_DIR", config.REPO_ROOT / "ir_codes")
+    mocker.patch("shutil.which", return_value="/usr/bin/ir-ctl")
+
+    from maxxair_fan.backends.remote_agent import RemoteAgentBackend
+    from maxxair_fan.fan_unit import FanUnit
+    from maxxair_fan.fans_config import FanSpec
+
+    remote = RemoteAgentBackend("http://unreachable-agent")
+    mocker.patch.object(remote, "health_check", return_value=False)
+    unit = FanUnit(
+        spec=FanSpec(id="fan2", firebase_node="fans/fan2", agent_url="http://unreachable-agent"),
+        sensor_be=remote,
+        ir_be=remote,
+    )
+
+    errors = main.validate_runtime(InMemoryFirebaseBackend(), [unit])
+    assert any("agent health check failed" in error for error in errors)
+
+
 def test_validate_runtime_missing_sensor(monkeypatch, mocker):
     monkeypatch.setattr(config, "MAXXAIR_BACKEND", "pi")
     monkeypatch.setattr(config, "MAXXAIR_SKIP_PREFLIGHT", False)

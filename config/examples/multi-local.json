@@ -1,0 +1,28 @@
+{
+  "fans": [
+    {
+      "id": "fan1",
+      "firebase_node": "fans/fan1",
+      "local": {
+        "sensor_path": "/sys/bus/w1/devices/28-000000000001/w1_slave",
+        "ir_device": "/dev/lirc0"
+      }
+    },
+    {
+      "id": "fan2",
+      "firebase_node": "fans/fan2",
+      "local": {
+        "sensor_path": "/sys/bus/w1/devices/28-000000000002/w1_slave",
+        "ir_device": "/dev/lirc1"
+      }
+    },
+    {
+      "id": "fan3",
+      "firebase_node": "fans/fan3",
+      "local": {
+        "sensor_path": "/sys/bus/w1/devices/28-000000000003/w1_slave",
+        "ir_device": "/dev/lirc2"
+      }
+    }
+  ]
+}

@@ -8,7 +8,10 @@ from maxxair_fan.backends.firebase_rest import FirebaseRestBackend
 from maxxair_fan.backends.in_memory_firebase import InMemoryFirebaseBackend
 from maxxair_fan.backends.irctl import IrCtlBackend
 from maxxair_fan.backends.protocols import FirebaseBackend, IRBackend, SensorBackend
+from maxxair_fan.backends.remote_agent import RemoteAgentBackend
 from maxxair_fan.backends.w1_sensor import W1SensorBackend
+from maxxair_fan.fan_unit import FanUnit
+from maxxair_fan.fans_config import FanSpec, load_fans_config
 
 
 def _resolve_backend_name(specific: str | None, simulator_default: str, pi_default: str) -> str:
@@ -23,6 +26,30 @@ def wrap_ir_backend(ir_be: IRBackend) -> DedupingIRBackend:
     if isinstance(ir_be, DedupingIRBackend):
         return ir_be
     return DedupingIRBackend(ir_be)
+
+
+def build_fan_unit(
+    spec: FanSpec,
+    *,
+    fake_sensor: FakeSensorBackend | None = None,
+    fake_ir: FakeIRBackend | None = None,
+    dedupe_ir: bool = True,
+) -> FanUnit:
+    if spec.is_remote:
+        if spec.agent_url is None:
+            raise ValueError(f"Fan {spec.id!r} is remote but agent_url is missing")
+        remote = RemoteAgentBackend(spec.agent_url, agent_token=spec.agent_token)
+        ir_be: IRBackend = wrap_ir_backend(remote) if dedupe_ir else remote
+        return FanUnit(spec=spec, sensor_be=remote, ir_be=ir_be)
+
+    local = spec.local
+    if local is None:
+        raise ValueError(f"Fan {spec.id!r} has no local or remote configuration")
+
+    sensor_be: SensorBackend = fake_sensor or W1SensorBackend(sensor_path=local.sensor_path)
+    inner_ir: IRBackend = fake_ir or IrCtlBackend(ir_device=local.ir_device)
+    ir_be = wrap_ir_backend(inner_ir) if dedupe_ir else inner_ir
+    return FanUnit(spec=spec, sensor_be=sensor_be, ir_be=ir_be)
 
 
 def build_backends(
@@ -67,6 +94,26 @@ def build_backends(
     return sensor_be, ir_be, fb_be
 
 
+def load_fan_units(
+    specs: list[FanSpec] | None = None,
+    *,
+    fake_sensors: dict[str, FakeSensorBackend] | None = None,
+    fake_ir: dict[str, FakeIRBackend] | None = None,
+) -> list[FanUnit]:
+    if specs is None:
+        specs = load_fans_config()
+    fake_sensors = fake_sensors or {}
+    fake_ir = fake_ir or {}
+    return [
+        build_fan_unit(
+            spec,
+            fake_sensor=fake_sensors.get(spec.id),
+            fake_ir=fake_ir.get(spec.id),
+        )
+        for spec in specs
+    ]
+
+
 __all__ = [
     "DedupingIRBackend",
     "FirebaseBackend",
@@ -76,8 +123,11 @@ __all__ = [
     "IRBackend",
     "InMemoryFirebaseBackend",
     "IrCtlBackend",
+    "RemoteAgentBackend",
     "SensorBackend",
     "W1SensorBackend",
     "build_backends",
+    "build_fan_unit",
+    "load_fan_units",
     "wrap_ir_backend",
 ]

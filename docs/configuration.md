@@ -16,15 +16,23 @@ maxxair-fan dump-state
 | --- | --- | --- |
 | `FIREBASE_URL` | *(required on Pi)* | Firebase RTDB base URL, e.g. `https://project-rtdb.firebaseio.com` |
 | `FIREBASE_SECRET` | *(required on Pi)* | Database secret for `?auth=` REST authentication |
-| `FAN_NODE` | `fans/fan1` | RTDB path for this fan's config and status |
+| `FAN_NODE` | `fans/fan1` | RTDB path for legacy single-fan mode (when `FANS_CONFIG` is unset) |
+| `FANS_CONFIG` | *(unset)* | Path to JSON fan registry (see [Topologies](topologies.md)) |
 
 See [Firebase schema](firebase-schema.md) for field definitions.
+
+## Multi-fan registry
+
+When `FANS_CONFIG` is set, the daemon loads all fans from the JSON file. When unset, a single fan is synthesized from `FAN_NODE`, `SENSOR_PATH`, and `IR_DEVICE`.
+
+Example configs: [`config/examples/`](../config/examples/). Full deployment guide: [Topologies](topologies.md).
 
 ## Hardware paths
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `IR_DIR` | `./ir_codes/` | Directory containing `.ir` code files |
+| `IR_DEVICE` | *(unset)* | IR blaster device for legacy single-fan mode, e.g. `/dev/lirc0` |
 | `SENSOR_PATH` | auto-detect | Full path to DS18B20 `w1_slave` file; first `28-*` device if unset |
 
 ## Control loop
@@ -96,6 +104,16 @@ FAKE_SENSOR_TEMP=73.5
 Or use CLI flags: `maxxair-fan run --simulator --once --tui`
 
 See [Development](development.md) for `./scripts/dev.sh` and fake Firebase.
+
+## Edge agent
+
+Run on remote Pis with `maxxair-fan agent`. See [Topologies](topologies.md).
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `AGENT_BIND` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
+| `AGENT_PORT` | `8765` | HTTP listen port |
+| `AGENT_TOKEN` | *(unset)* | Bearer token for agent auth (recommended on LAN) |
 
 ## systemd
 

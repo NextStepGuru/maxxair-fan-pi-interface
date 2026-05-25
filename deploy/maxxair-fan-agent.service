@@ -1,0 +1,37 @@
+[Unit]
+Description=MaxxAir Fan Edge Agent (sensor + IR for remote control)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/maxxair-fan-pi-interface
+EnvironmentFile=/home/pi/maxxair-fan-pi-interface/.env
+ExecStart=/home/pi/maxxair-fan-pi-interface/.venv/bin/python -m maxxair_fan agent --bind 0.0.0.0
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/tmp /var/run /home/pi/maxxair-fan-pi-interface
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+DeviceAllow=/dev/lirc0 rw
+DeviceAllow=char-w1 r
+SupplementaryGroups=video gpio
+
+[Install]
+WantedBy=multi-user.target

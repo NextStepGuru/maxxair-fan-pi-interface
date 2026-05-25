@@ -181,8 +181,7 @@ def test_main_runs_two_iterations_then_shuts_down(mocker):
     mocker.patch.object(config, "FAN_OFF_ON_EXIT", False)
     mocker.patch.object(config, "CHECK_INTERVAL", 1)
     iteration = mocker.patch(
-        "maxxair_fan.main.run_loop_iteration",
-        return_value=(72.0, "in", None, None),
+        "maxxair_fan.main.run_multi_fan_iteration",
     )
     sleep_calls = {"count": 0}
 
@@ -204,13 +203,10 @@ def test_main_fan_off_on_exit(mocker):
     mocker.patch("maxxair_fan.main.acquire_single_instance_lock", return_value=True)
     mocker.patch("maxxair_fan.main.release_single_instance_lock")
     mocker.patch(
-        "maxxair_fan.main.run_loop_iteration",
-        return_value=(72.0, "in", None, None),
+        "maxxair_fan.main.run_multi_fan_iteration",
+        side_effect=lambda *_a, **_k: main.request_shutdown(),
     )
-    mocker.patch(
-        "maxxair_fan.main.time.sleep",
-        side_effect=lambda _: main.request_shutdown(),
-    )
+    mocker.patch("maxxair_fan.main.time.sleep")
     mocker.patch("maxxair_fan.main.config.configure_logging")
     mocker.patch.object(config, "FAN_OFF_ON_EXIT", True)
 

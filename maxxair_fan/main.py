@@ -5,15 +5,39 @@ import signal
 import sys
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path
 
-from maxxair_fan import config, fan, sensor
-from maxxair_fan.backends import build_backends, wrap_ir_backend
-from maxxair_fan.backends.deduping_ir import DedupingIRBackend
+from maxxair_fan import config, sensor
+from maxxair_fan.backends import build_backends, load_fan_units
 from maxxair_fan.backends.protocols import FirebaseBackend, IRBackend, SensorBackend
+from maxxair_fan.backends.remote_agent import RemoteAgentBackend
+from maxxair_fan.fan_unit import (
+    FanState,
+    FanUnit,
+    should_patch_firebase,
+    should_patch_status,
+)
+from maxxair_fan.fan_unit import (
+    build_status_patch as _build_status_patch,
+)
+from maxxair_fan.fans_config import legacy_fan_spec
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "acquire_single_instance_lock",
+    "build_status_patch",
+    "is_shutdown_requested",
+    "main",
+    "release_single_instance_lock",
+    "request_shutdown",
+    "reset_shutdown_flag",
+    "run_loop_iteration",
+    "run_multi_fan_iteration",
+    "should_patch_firebase",
+    "should_patch_status",
+    "validate_runtime",
+]
 
 # Module-level daemon state (single process, single instance lock).
 _shutdown_requested = False
@@ -36,36 +60,6 @@ def reset_shutdown_flag() -> None:
     _shutdown_requested = False
 
 
-def should_patch_firebase(
-    last_patched_temp: float | None,
-    current_temp: float,
-    last_patch_time: float | None,
-    now: float,
-) -> bool:
-    if last_patched_temp is None:
-        return True
-
-    if abs(current_temp - last_patched_temp) >= config.TEMP_PATCH_THRESHOLD:
-        return True
-
-    if last_patch_time is None:
-        return True
-
-    return (now - last_patch_time) >= config.PATCH_HEARTBEAT_SECONDS
-
-
-def should_patch_status(last_patch_time: float | None, now: float) -> bool:
-    if last_patch_time is None:
-        return True
-    return (now - last_patch_time) >= config.PATCH_HEARTBEAT_SECONDS
-
-
-def _ir_last_sent(ir_be: IRBackend) -> str | None:
-    if isinstance(ir_be, DedupingIRBackend):
-        return ir_be.last_sent
-    return None
-
-
 def build_status_patch(
     *,
     now_iso: str,
@@ -74,22 +68,25 @@ def build_status_patch(
     ir_ok: bool,
     last_ir_command: str | None,
     last_error: str | None,
+    sensor_crc_failures: int | None = None,
 ) -> dict:
-    patch = {
-        "lastUpdate": now_iso,
-        "online": True,
-        "sensorOk": sensor_ok,
-        "irOk": ir_ok,
-        "lastIrCommand": last_ir_command,
-        "lastError": last_error,
-        "sensorCrcFailures": sensor.sensor_crc_failures,
-    }
-    if current_temp is not None:
-        patch["currentTemp"] = current_temp
-    return patch
+    if sensor_crc_failures is None:
+        sensor_crc_failures = sensor.sensor_crc_failures
+    return _build_status_patch(
+        now_iso=now_iso,
+        current_temp=current_temp,
+        sensor_ok=sensor_ok,
+        ir_ok=ir_ok,
+        last_ir_command=last_ir_command,
+        last_error=last_error,
+        sensor_crc_failures=sensor_crc_failures,
+    )
 
 
-def validate_runtime(fb_be: FirebaseBackend | None = None) -> list[str]:
+def validate_runtime(
+    fb_be: FirebaseBackend | None = None,
+    fan_units: list[FanUnit] | None = None,
+) -> list[str]:
     """Return a list of preflight errors (empty if ready to run on Pi hardware)."""
     if config.MAXXAIR_BACKEND == "simulator":
         return []
@@ -105,7 +102,16 @@ def validate_runtime(fb_be: FirebaseBackend | None = None) -> list[str]:
     if firebase_name == "rest" and not config.FIREBASE_URL:
         errors.append("FIREBASE_URL is not set")
 
-    if shutil.which("ir-ctl") is None:
+    if fan_units is None:
+        try:
+            fan_units = load_fan_units()
+        except (FileNotFoundError, ValueError) as exc:
+            errors.append(str(exc))
+            return errors
+
+    has_local = any(unit.spec.is_local for unit in fan_units)
+
+    if has_local and shutil.which("ir-ctl") is None:
         errors.append("ir-ctl not found on PATH (install v4l-utils)")
 
     if not config.IR_DIR.exists():
@@ -113,14 +119,37 @@ def validate_runtime(fb_be: FirebaseBackend | None = None) -> list[str]:
     elif not (config.IR_DIR / "fan_off.ir").exists():
         errors.append(f"fan_off.ir missing from IR_DIR: {config.IR_DIR}")
 
-    sensor_path = sensor.get_sensor_path()
-    if sensor_path is None:
-        errors.append("No DS18B20 sensor found (enable 1-wire or set SENSOR_PATH)")
+    for unit in fan_units:
+        if unit.spec.is_local:
+            local = unit.spec.local
+            if local and local.sensor_path:
+                sensor_path = Path(local.sensor_path)
+                if not sensor_path.exists():
+                    errors.append(
+                        f"Fan {unit.spec.id}: sensor path not found: {local.sensor_path}"
+                    )
+            elif len([u for u in fan_units if u.spec.is_local]) == 1:
+                if sensor.get_sensor_path() is None:
+                    errors.append(
+                        f"Fan {unit.spec.id}: no DS18B20 sensor found "
+                        "(enable 1-wire or set sensor_path)"
+                    )
+            else:
+                errors.append(
+                    f"Fan {unit.spec.id}: sensor_path required when multiple local fans"
+                )
+        else:
+            remote = unit.sensor_be
+            if isinstance(remote, RemoteAgentBackend) and not remote.health_check():
+                errors.append(
+                    f"Fan {unit.spec.id}: agent health check failed "
+                    f"({unit.spec.agent_url})"
+                )
 
-    if firebase_name == "rest" and config.FIREBASE_URL and fb_be is not None:
-        probe = fb_be.get(config.FAN_NODE)
-        if probe is None and config.FIREBASE_URL:
-            errors.append(f"Firebase GET failed for {config.FAN_NODE}")
+        if firebase_name == "rest" and config.FIREBASE_URL and fb_be is not None:
+            probe = fb_be.get(unit.spec.firebase_node)
+            if probe is None:
+                errors.append(f"Firebase GET failed for {unit.spec.firebase_node}")
 
     return errors
 
@@ -172,7 +201,7 @@ def run_loop_iteration(
     on_iteration: Callable[[dict], None] | None = None,
     now: float | None = None,
 ) -> tuple[float, str, float | None, float | None]:
-    """Run one control-loop iteration. Returns updated cache state."""
+    """Run one control-loop iteration for the legacy single-fan API."""
     if sensor_be is None or ir_be is None or fb_be is None:
         default_sensor, default_ir, default_fb = build_backends()
         sensor_be = sensor_be or default_sensor
@@ -180,90 +209,37 @@ def run_loop_iteration(
         fb_be = fb_be or default_fb
 
     current_now = now if now is not None else time.time()
-    now_iso = datetime.fromtimestamp(current_now, tz=UTC).isoformat()
-    iteration_state: dict = {
-        "current_temp": None,
-        "target_temp": cached_target_temp,
-        "direction": cached_direction,
-        "speed": 0,
-        "ir_filename": None,
-        "ir_sent": False,
-        "patched": False,
-        "patch_reason": "skipped",
-    }
+    unit = FanUnit(
+        spec=legacy_fan_spec(),
+        sensor_be=sensor_be,
+        ir_be=ir_be,
+        state=FanState(
+            cached_target_temp=cached_target_temp,
+            cached_direction=cached_direction,
+            last_patched_temp=last_patched_temp,
+            last_patch_time=last_patch_time,
+            sensor_crc_failures=sensor.sensor_crc_failures,
+        ),
+    )
+    state = unit.run_iteration(fb_be, current_now, on_iteration)
+    return (
+        state.cached_target_temp,
+        state.cached_direction,
+        state.last_patched_temp,
+        state.last_patch_time,
+    )
 
-    data = fb_be.get(config.FAN_NODE)
-    if isinstance(data, dict):
-        if "targetTemp" in data:
-            try:
-                cached_target_temp = float(data["targetTemp"])
-                iteration_state["target_temp"] = cached_target_temp
-            except (TypeError, ValueError):
-                logger.warning("Invalid targetTemp in Firebase: %r", data["targetTemp"])
 
-        if "direction" in data and data["direction"] in ("in", "out"):
-            cached_direction = data["direction"]
-            iteration_state["direction"] = cached_direction
-
-    current_temp = sensor_be.read_temp_f()
-    iteration_state["current_temp"] = current_temp
-
-    last_ir_command = _ir_last_sent(ir_be)
-    ir_ok = True
-    last_error: str | None = None
-
-    if current_temp is not None:
-        speed = fan.compute_speed(current_temp, cached_target_temp)
-        filename = fan.resolve_ir_filename(cached_direction, speed)
-        iteration_state["speed"] = speed
-        iteration_state["ir_filename"] = filename
-
-        sent = ir_be.send(filename)
-        iteration_state["ir_sent"] = sent and filename != last_ir_command
-        ir_ok = sent
-        if not sent:
-            last_error = f"IR send failed for {filename}"
-        last_ir_command = _ir_last_sent(ir_be)
-
-        if should_patch_firebase(last_patched_temp, current_temp, last_patch_time, current_now):
-            iteration_state["patch_reason"] = "updated"
-            if fb_be.patch(
-                config.FAN_NODE,
-                build_status_patch(
-                    now_iso=now_iso,
-                    current_temp=current_temp,
-                    sensor_ok=True,
-                    ir_ok=ir_ok,
-                    last_ir_command=last_ir_command,
-                    last_error=last_error,
-                ),
-            ):
-                last_patched_temp = current_temp
-                last_patch_time = current_now
-                iteration_state["patched"] = True
-        else:
-            iteration_state["patch_reason"] = "throttled"
-    elif should_patch_status(last_patch_time, current_now):
-        iteration_state["patch_reason"] = "sensor_failure"
-        last_error = "DS18B20 read failed"
-        if fb_be.patch(
-            config.FAN_NODE,
-            build_status_patch(
-                now_iso=now_iso,
-                current_temp=None,
-                sensor_ok=False,
-                ir_ok=ir_ok,
-                last_ir_command=last_ir_command,
-                last_error=last_error,
-            ),
-        ):
-            last_patch_time = current_now
-            iteration_state["patched"] = True
-
-    if on_iteration is not None:
-        on_iteration(iteration_state)
-
-    return cached_target_temp, cached_direction, last_patched_temp, last_patch_time
+def run_multi_fan_iteration(
+    fan_units: list[FanUnit],
+    fb_be: FirebaseBackend,
+    on_iteration: Callable[[dict], None] | None = None,
+    now: float | None = None,
+) -> None:
+    """Run one control-loop iteration for all configured fans."""
+    current_now = now if now is not None else time.time()
+    for unit in fan_units:
+        unit.run_iteration(fb_be, current_now, on_iteration)
 
 
 def main(
@@ -274,19 +250,42 @@ def main(
     sensor_be: SensorBackend | None = None,
     ir_be: IRBackend | None = None,
     fb_be: FirebaseBackend | None = None,
+    fan_units: list[FanUnit] | None = None,
     on_iteration: Callable[[dict], None] | None = None,
 ) -> None:
     config.configure_logging()
     logger.info("Starting MaxxAir fan controller (backend=%s)", config.MAXXAIR_BACKEND)
 
-    if sensor_be is None or ir_be is None or fb_be is None:
-        built_sensor, built_ir, built_fb = build_backends()
-        sensor_be = sensor_be or built_sensor
-        ir_be = ir_be or built_ir
-        fb_be = fb_be or built_fb
+    if fan_units is None:
+        if sensor_be is not None or ir_be is not None:
+            if sensor_be is None or ir_be is None or fb_be is None:
+                built_sensor, built_ir, built_fb = build_backends()
+                sensor_be = sensor_be or built_sensor
+                ir_be = ir_be or built_ir
+                fb_be = fb_be or built_fb
+            fan_units = [
+                FanUnit(
+                    spec=legacy_fan_spec(),
+                    sensor_be=sensor_be,
+                    ir_be=ir_be,
+                )
+            ]
+        else:
+            _, _, built_fb = build_backends()
+            fb_be = fb_be or built_fb
+            fan_units = load_fan_units()
+    else:
+        if fb_be is None:
+            _, _, fb_be = build_backends()
+
+    if fb_be is None:
+        _, _, fb_be = build_backends()
+
+    fan_ids = ", ".join(unit.spec.id for unit in fan_units)
+    logger.info("Controlling %d fan(s): %s", len(fan_units), fan_ids)
 
     if not skip_preflight and config.MAXXAIR_BACKEND != "simulator":
-        errors = validate_runtime(fb_be)
+        errors = validate_runtime(fb_be, fan_units)
         if errors:
             for error in errors:
                 logger.error("Preflight failed: %s", error)
@@ -298,26 +297,11 @@ def main(
     signal.signal(signal.SIGTERM, request_shutdown)
     signal.signal(signal.SIGINT, request_shutdown)
 
-    cached_target_temp = 72.0
-    cached_direction = "in"
-    last_patched_temp: float | None = None
-    last_patch_time: float | None = None
-
     try:
         while not is_shutdown_requested():
-            (
-                cached_target_temp,
-                cached_direction,
-                last_patched_temp,
-                last_patch_time,
-            ) = run_loop_iteration(
-                cached_target_temp,
-                cached_direction,
-                last_patched_temp,
-                last_patch_time,
-                sensor_be=sensor_be,
-                ir_be=ir_be,
-                fb_be=fb_be,
+            run_multi_fan_iteration(
+                fan_units,
+                fb_be,
                 on_iteration=on_iteration,
             )
             if once:
@@ -325,8 +309,9 @@ def main(
             time.sleep(config.CHECK_INTERVAL)
     finally:
         if config.FAN_OFF_ON_EXIT:
-            logger.info("Sending fan_off on exit")
-            wrap_ir_backend(ir_be).send("fan_off.ir")
+            logger.info("Sending fan_off on exit for all fans")
+            for unit in fan_units:
+                unit.ir_be.send("fan_off.ir")
 
         if use_lock:
             release_single_instance_lock()
