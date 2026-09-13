@@ -9,9 +9,13 @@ maxxair-fan dump-state
 
 On a Pi with systemd: `journalctl -u maxxair-fan -f`
 
+Using AtomS3 Lite agents: [AtomS3 Lite agent](#atoms3-lite-agent) and [AtomS3 Lite agents](atoms3-agent.md).
+
 ## Sensor not found
 
 **Symptoms:** `check` fails on sensor; `sensorOk: false` in Firebase; logs mention missing `28-*` device.
+
+For remote AtomS3 agents this section does not apply — see [AtomS3 Lite agent](#atoms3-lite-agent).
 
 **Fixes**
 
@@ -40,6 +44,8 @@ CRC failures increment `sensorCrcFailures` in Firebase. The daemon retries reads
 ## IR not working
 
 **Symptoms:** Fan does not respond; `irOk: false`; `lastError` mentions IR or `ir-ctl`.
+
+For AtomS3 onboard IR, skip `ir-ctl` / `/dev/lirc0` and use [AtomS3 Lite agent](#atoms3-lite-agent).
 
 **Fixes**
 
@@ -82,7 +88,7 @@ CRC failures increment `sensorCrcFailures` in Firebase. The daemon retries reads
 
 2. Confirm the secret matches Firebase Console → Realtime Database → Rules / legacy secret.
 
-3. Check RTDB security rules allow the Pi to write. See [Firebase schema → Security rules](firebase-schema.md#security-rules).
+3. Check RTDB security rules allow the hub to write. See [Firebase schema → Security rules](firebase-schema.md#security-rules).
 
 4. Test with curl:
 
@@ -166,6 +172,31 @@ CRC failures increment `sensorCrcFailures` in Firebase. The daemon retries reads
    ```bash
    sudo -u pi bash -c 'cd /home/pi/maxxair-fan-pi-interface && .venv/bin/python -m maxxair_fan check'
    ```
+
+## AtomS3 Lite agent
+
+**Symptoms:** Hub `check` fails on agent health; `sensorOk`/`irOk` false for a remote fan; Atom LED stays orange or red.
+
+**Fixes**
+
+1. Confirm the unit joined Wi-Fi: serial console should print an IP and `http://maxxair-fanN.local:8765`. Orange LED means Wi-Fi is down.
+
+2. Test the HTTP contract:
+
+   ```bash
+   curl http://maxxair-fan1.local:8765/health
+   curl -H "Authorization: Bearer $AGENT_TOKEN" http://maxxair-fan1.local:8765/temp
+   curl -H "Authorization: Bearer $AGENT_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"filename":"fan_off.ir"}' \
+     http://maxxair-fan1.local:8765/ir
+   ```
+
+3. DS18B20 reads of −127 °C / 503: `pinMode(G5, INPUT)` must run after `M5.begin()`. Check 3.3 V power and the 4.7 kΩ pull-up to 3.3 V, not 5 V.
+
+4. Fan ignores IR: aim GPIO 4's IR window at the MaxxAir receiver from inside the cabin. The Lite's IR range is unpublished — confirm `fan_off.ir` before placing the other units.
+
+5. Flash: hold reset ~2 s until the green LED lights, then `pio run -e fan1 -t upload`. See [AtomS3 Lite agents](atoms3-agent.md).
 
 ## Getting help
 

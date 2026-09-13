@@ -1,6 +1,8 @@
 # Quickstart
 
-Get the MaxxAir fan controller running on a Raspberry Pi.
+Get the MaxxAir fan controller running on a Raspberry Pi that owns both the sensor and the IR blaster.
+
+For **three fans on AtomS3 Lite agents** (hub Python + onboard IR), skip this page and follow [AtomS3 Lite agents](atoms3-agent.md).
 
 ## Prerequisites
 
@@ -117,5 +119,6 @@ The unit file lives at [`deploy/maxxair-fan.service`](../deploy/maxxair-fan.serv
 ## Next steps
 
 - Tune the fan curve: [Configuration → Fan speed curve](configuration.md#fan-speed-curve)
+- Three AtomS3 Lite fans: [AtomS3 Lite agents](atoms3-agent.md)
 - Explore CLI tools: [CLI reference](cli.md)
 - Develop without a Pi: [Development](development.md)

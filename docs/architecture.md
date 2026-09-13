@@ -7,14 +7,15 @@ How the MaxxAir Fan Pi Interface reads temperature, syncs with Firebase, and con
 ```
 ┌─────────────┐     read/write      ┌──────────────────┐
 │  Firebase   │◄───────────────────►│  maxxair_fan     │
-│  RTDB       │  targetTemp,        │  daemon          │
+│  RTDB       │  targetTemp,        │  hub daemon      │
 │             │  direction, status  │                  │
 └─────────────┘                     └────────┬─────────┘
                                              │
-                              ┌──────────────┼──────────────┐
-                              ▼              ▼              ▼
-                        DS18B20         ir-ctl         (optional
-                        1-wire          + .ir files     fake backends)
+                    ┌────────────────────────┼────────────────────────┐
+                    ▼                        ▼                        ▼
+              local DS18B20            remote HTTP agent         (optional
+              + ir-ctl                 (Pi or AtomS3 Lite)        fake backends)
+                                       DS18B20 + IR
 ```
 
 The daemon runs a loop every `CHECK_INTERVAL` seconds (default 2). Each tick iterates all configured fans (from `FANS_CONFIG` or legacy single-fan env):
@@ -25,7 +26,7 @@ The daemon runs a loop every `CHECK_INTERVAL` seconds (default 2). Each tick ite
 4. **Send** the matching pre-recorded IR code (skipped if unchanged)
 5. **Write** status telemetry back to Firebase
 
-Multi-fan deployments: [Topologies](topologies.md).
+Multi-fan deployments, including three AtomS3 Lite agents: [Topologies](topologies.md).
 
 ## Control loop
 
@@ -33,11 +34,11 @@ Each iteration in `maxxair_fan/main.py`:
 
 | Step | Action |
 | --- | --- |
-| Fetch config | GET `targetTemp`, `direction` from `FAN_NODE` |
-| Read sensor | DS18B20 via `/sys/bus/w1/devices/28-*/w1_slave` |
+| Fetch config | GET `targetTemp`, `direction` from the fan's Firebase node |
+| Read sensor | Local DS18B20 via `/sys/bus/w1/devices/28-*/w1_slave`, or `GET /temp` on a remote agent |
 | Compute speed | `fan.compute_speed(current, target)` |
 | Resolve IR file | e.g. `fan_on_in_40.ir` or `fan_off.ir` |
-| Send IR | `ir-ctl -s` via backend (deduped if same as last send) |
+| Send IR | Local `ir-ctl -s`, or `POST /ir` on a remote agent (deduped if same as last send) |
 | Patch Firebase | Status fields when temp changes ≥ threshold or on heartbeat |
 
 Firebase writes are throttled:
@@ -83,18 +84,21 @@ Pre-recorded signals live in [`ir_codes/`](../ir_codes/):
 | Intake at N% | `fan_on_in_10.ir` … `fan_on_in_100.ir` |
 | Exhaust at N% | `fan_on_out_10.ir` … `fan_on_out_100.ir` |
 
-Filename resolution is in `maxxair_fan/fan.py` → `resolve_ir_filename()`.
+Filename resolution is in `maxxair_fan/fan.py` → `resolve_ir_filename()`. AtomS3 Lite agents compile the same files to PROGMEM raw timings via [`scripts/ir_to_rmt.py`](../scripts/ir_to_rmt.py).
 
 ## Backends
 
-Hardware access is abstracted so the same loop runs on a Pi or in simulation.
+Hardware access is abstracted so the same loop runs on a Pi, against remote agents, or in simulation.
 
-| Backend | `MAXXAIR_BACKEND` | Sensor | IR | Firebase |
+| Backend | How selected | Sensor | IR | Firebase |
 | --- | --- | --- | --- | --- |
-| Pi (default) | `pi` | `w1` (DS18B20) | `irctl` | `rest` |
-| Simulator | `simulator` | `fake` | `fake` | `memory` or `rest` |
+| Pi (default) | `MAXXAIR_BACKEND=pi` | `w1` (DS18B20) | `irctl` | `rest` |
+| Remote agent | `FANS_CONFIG` `agent_url` | HTTP `GET /temp` | HTTP `POST /ir` | `rest` on the hub |
+| Simulator | `MAXXAIR_BACKEND=simulator` | `fake` | `fake` | `memory` or `rest` |
 
-Override individual layers with `SENSOR_BACKEND`, `IR_BACKEND`, and `FIREBASE_BACKEND`. See [Configuration → Backends](configuration.md#backends).
+Remote agents may be a Pi running `maxxair-fan agent` or an [AtomS3 Lite](atoms3-agent.md). The hub still owns Firebase and IR filename dedupe.
+
+Override individual local layers with `SENSOR_BACKEND`, `IR_BACKEND`, and `FIREBASE_BACKEND`. See [Configuration → Backends](configuration.md#backends).
 
 `DedupingIRBackend` wraps the IR backend and skips sending when the resolved filename matches the previous send.
 
@@ -103,7 +107,7 @@ Override individual layers with `SENSOR_BACKEND`, `IR_BACKEND`, and `FIREBASE_BA
 - **Single instance:** flock lock at `LOCK_FILE` (default `/tmp/maxxair-fan.lock`)
 - **Signals:** SIGINT/SIGTERM set a shutdown flag; loop exits cleanly
 - **Optional shutdown IR:** `FAN_OFF_ON_EXIT=true` sends `fan_off.ir` on exit
-- **Preflight:** On Pi startup, validates Firebase, sensor, IR dir, and `ir-ctl` unless `MAXXAIR_SKIP_PREFLIGHT=true`
+- **Preflight:** Validates Firebase, then local `ir-ctl`/DS18B20 for local fans or agent `/health` for remote fans, unless `MAXXAIR_SKIP_PREFLIGHT=true`
 
 ## Package layout
 
@@ -115,14 +119,19 @@ maxxair_fan/
   firebase.py      REST GET/PATCH helpers
   config.py        Environment-based settings
   cli.py           Subcommands (run, check, simulate, …)
-  backends/        Pi vs fake implementations
+  backends/        Pi, remote-agent, and fake implementations
   devtools/        Fake Firebase HTTP server and live TUI
 ir_codes/          Recorded MaxxAir IR signals
+firmware/          AtomS3 Lite edge-agent firmware
+scripts/ir_to_rmt.py  Compile `.ir` files to ESP32 PROGMEM arrays
+config/examples/   Hub JSON registries (including hub-atoms3.json)
 tests/             Unit and integration tests
 ```
 
 ## Related docs
 
+- [Topologies](topologies.md) — local Pi, hub + remote Pi, hub + AtomS3 Lite
 - [Firebase schema](firebase-schema.md) — fields written to RTDB
 - [CLI reference](cli.md) — run, check, simulate, replay
+- [AtomS3 Lite agents](atoms3-agent.md) — hub + three Atom edge devices
 - [Development](development.md) — fake backends and replay fixtures

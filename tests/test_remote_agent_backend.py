@@ -3,6 +3,11 @@ import responses
 from maxxair_fan.backends.remote_agent import RemoteAgentBackend
 
 
+def test_remote_agent_default_timeout():
+    backend = RemoteAgentBackend("http://agent")
+    assert backend.timeout == 5
+
+
 @responses.activate
 def test_remote_agent_health_check():
     responses.add(responses.GET, "http://agent/health", json={"ok": True}, status=200)

@@ -123,6 +123,16 @@ maxxair-fan replay tests/fixtures/heating_up.json --rate 5.0
 
 4. Add to `tests/integration/test_replay_fixtures.py` parametrize list for CI.
 
+## AtomS3 Lite firmware
+
+Regenerate IR arrays after editing `ir_codes/`:
+
+```bash
+python3 scripts/ir_to_rmt.py
+```
+
+Flash and wiring: [AtomS3 Lite agents](atoms3-agent.md). Tests: `tests/test_ir_to_rmt.py` (header stays in sync with `ir_codes/`).
+
 ## Tests
 
 ```bash
@@ -144,8 +154,10 @@ ruff format .
 | --- | --- |
 | `maxxair_fan/main.py` | Loop, preflight, Firebase patch logic |
 | `maxxair_fan/fan.py` | Speed curve, IR filename resolution |
-| `maxxair_fan/backends/` | Swappable Pi vs fake implementations |
+| `maxxair_fan/backends/` | Swappable Pi, remote-agent, and fake implementations |
 | `maxxair_fan/devtools/` | Fake Firebase server, live TUI |
+| `firmware/atoms3-agent/` | AtomS3 Lite HTTP agent (IR GPIO 4, DS18B20 G5) |
+| `scripts/ir_to_rmt.py` | Compile `ir_codes/*.ir` to ESP32 PROGMEM headers |
 
 Read [Architecture](architecture.md) for the full data flow.
 
@@ -153,4 +165,5 @@ Read [Architecture](architecture.md) for the full data flow.
 
 - [Configuration → Backends](configuration.md#backends)
 - [CLI reference](cli.md)
+- [AtomS3 Lite agents](atoms3-agent.md)
 - [CONTRIBUTING.md](../CONTRIBUTING.md)

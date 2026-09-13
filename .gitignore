@@ -217,3 +217,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PlatformIO / AtomS3 firmware secrets
+.pio/
+firmware/**/.pio/
+firmware/**/src/secrets.h
+
+.zvec-grep/

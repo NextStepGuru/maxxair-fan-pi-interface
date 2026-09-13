@@ -25,15 +25,15 @@ See [Firebase schema](firebase-schema.md) for field definitions.
 
 When `FANS_CONFIG` is set, the daemon loads all fans from the JSON file. When unset, a single fan is synthesized from `FAN_NODE`, `SENSOR_PATH`, and `IR_DEVICE`.
 
-Example configs: [`config/examples/`](../config/examples/). Full deployment guide: [Topologies](topologies.md).
+Example configs: [`config/examples/`](../config/examples/) (`single-local.json`, `hub-remote.json`, `hub-atoms3.json`, `multi-local.json`). Full deployment guide: [Topologies](topologies.md). AtomS3 Lite hub example: [AtomS3 Lite agents](atoms3-agent.md).
 
 ## Hardware paths
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `IR_DIR` | `./ir_codes/` | Directory containing `.ir` code files |
-| `IR_DEVICE` | *(unset)* | IR blaster device for legacy single-fan mode, e.g. `/dev/lirc0` |
-| `SENSOR_PATH` | auto-detect | Full path to DS18B20 `w1_slave` file; first `28-*` device if unset |
+| `IR_DEVICE` | *(unset)* | IR blaster device for legacy single-fan mode, e.g. `/dev/lirc0` (unused when fans are remote agents) |
+| `SENSOR_PATH` | auto-detect | Full path to DS18B20 `w1_slave` file; first `28-*` device if unset (unused when fans are remote agents) |
 
 ## Control loop
 
@@ -84,6 +84,8 @@ Set `MAXXAIR_BACKEND=simulator` for local development, or override individual la
 | `IR_BACKEND` | *(inherits)* | `irctl`, `fake` | IR sender |
 | `FIREBASE_BACKEND` | *(inherits)* | `rest`, `memory` | Firebase client |
 
+Fans listed with `agent_url` in `FANS_CONFIG` use [`RemoteAgentBackend`](../maxxair_fan/backends/remote_agent.py) (`GET /temp`, `POST /ir`) and ignore local `SENSOR_BACKEND` / `IR_BACKEND`.
+
 ### Simulator-only
 
 | Variable | Default | Description |
@@ -107,13 +109,17 @@ See [Development](development.md) for `./scripts/dev.sh` and fake Firebase.
 
 ## Edge agent
 
-Run on remote Pis with `maxxair-fan agent`. See [Topologies](topologies.md).
+Hub talks to remote hardware over HTTP. Remote Pis run `maxxair-fan agent`; AtomS3 Lite units run [`firmware/atoms3-agent/`](../firmware/atoms3-agent/). See [Topologies](topologies.md) and [AtomS3 Lite agents](atoms3-agent.md).
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `AGENT_BIND` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
-| `AGENT_PORT` | `8765` | HTTP listen port |
-| `AGENT_TOKEN` | *(unset)* | Bearer token for agent auth (recommended on LAN) |
+| `AGENT_BIND` | `127.0.0.1` | Bind address for `maxxair-fan agent` (`0.0.0.0` for remote access). Unused on Atom firmware. |
+| `AGENT_PORT` | `8765` | HTTP listen port (`maxxair-fan agent` and Atom firmware) |
+| `AGENT_TOKEN` | *(unset)* | Bearer token for agent auth (recommended on LAN). Must match Atom `secrets.h`. |
+
+Remote HTTP calls from the hub to an agent use a 5 second timeout in [`RemoteAgentBackend`](../maxxair_fan/backends/remote_agent.py) (DS18B20 conversion plus IR).
+
+AtomS3 Lite hub example: [`config/examples/hub-atoms3.json`](../config/examples/hub-atoms3.json).
 
 ## systemd
 

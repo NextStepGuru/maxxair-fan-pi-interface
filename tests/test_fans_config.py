@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
 
 import pytest
 
 from maxxair_fan import config
 from maxxair_fan.fans_config import legacy_fan_spec, load_fans_config
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_legacy_fan_spec(monkeypatch):
@@ -91,3 +94,11 @@ def test_load_fans_config_empty_fans(tmp_path):
 def test_load_fans_config_missing_file():
     with pytest.raises(FileNotFoundError):
         load_fans_config("/nonexistent/fans.json")
+
+
+def test_hub_atoms3_example_loads():
+    specs = load_fans_config(REPO_ROOT / "config" / "examples" / "hub-atoms3.json")
+    assert [spec.id for spec in specs] == ["fan1", "fan2", "fan3"]
+    assert all(spec.is_remote for spec in specs)
+    assert specs[0].agent_url == "http://maxxair-fan1.local:8765"
+    assert specs[2].firebase_node == "fans/fan3"

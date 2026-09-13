@@ -23,9 +23,9 @@ maxxair-fan run
 
 See [`config/examples/single-local.json`](../config/examples/single-local.json).
 
-## Topology 2: Hub Pi + remote fan Pis
+## Topology 2: Hub + remote fan Pis
 
-A central Pi runs the daemon with **no local fans**. Each remote Pi runs an edge agent that exposes sensor + IR over HTTP.
+A central host runs the daemon with **no local fans**. Each remote Pi runs an edge agent that exposes sensor + IR over HTTP. For AtomS3 Lite instead of remote Pis, use [Topology 2b](#topology-2b-hub--three-atoms3-lite-agents).
 
 **Hub Pi** (`.env`):
 
@@ -60,6 +60,27 @@ sudo systemctl enable --now maxxair-fan
 ```
 
 See [`config/examples/hub-remote.json`](../config/examples/hub-remote.json).
+
+### Topology 2b: Hub + three AtomS3 Lite agents
+
+Same hub process and HTTP contract. Each MaxxAir fan gets its own [AtomS3 Lite](atoms3-agent.md) (onboard IR on GPIO 4, DS18B20 on G5). The hub host does **not** need `ir-ctl` or a local sensor.
+
+**Hub** (`.env`):
+
+```bash
+FIREBASE_URL=https://your-project-rtdb.firebaseio.com
+FIREBASE_SECRET=your_secret
+FANS_CONFIG=/home/pi/maxxair-fan-pi-interface/config/examples/hub-atoms3.json
+AGENT_TOKEN=your_shared_secret
+```
+
+Flash identities `maxxair-fan1` / `fan2` / `fan3` so the hub URLs match:
+
+- `http://maxxair-fan1.local:8765`
+- `http://maxxair-fan2.local:8765`
+- `http://maxxair-fan3.local:8765`
+
+See [`config/examples/hub-atoms3.json`](../config/examples/hub-atoms3.json) and [AtomS3 Lite agents](atoms3-agent.md) (wiring, download mode, IR range check).
 
 ## Topology 3: Multiple fans on one Pi
 
@@ -117,6 +138,8 @@ Run with `maxxair-fan agent` on remote Pis.
 
 When `AGENT_TOKEN` is set, requests must include `Authorization: Bearer <token>` (except `/health`).
 
+On AtomS3 Lite hardware this API is served by [`firmware/atoms3-agent/`](../firmware/atoms3-agent/). See [AtomS3 Lite agents](atoms3-agent.md).
+
 ## Firebase nodes
 
 Create one RTDB node per fan (e.g. `fans/fan1`, `fans/fan2`, `fans/fan3`). Each node uses the same schema documented in [Firebase schema](firebase-schema.md).
@@ -126,3 +149,4 @@ Create one RTDB node per fan (e.g. `fans/fan1`, `fans/fan2`, `fans/fan3`). Each 
 - [Configuration](configuration.md) — environment variables
 - [Architecture](architecture.md) — control loop details
 - [CLI reference](cli.md) — `run`, `agent`, `check`
+- [AtomS3 Lite agents](atoms3-agent.md) — three-fan hub with onboard IR

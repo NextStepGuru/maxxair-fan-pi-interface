@@ -28,7 +28,11 @@ maxxair-fan run --simulator --tui
 **Examples**
 
 ```bash
-# Production on Pi
+# Production on a local Pi
+maxxair-fan run
+
+# Hub controlling three AtomS3 Lite agents
+# FANS_CONFIG=.../hub-atoms3.json AGENT_TOKEN=...
 maxxair-fan run
 
 # Single iteration for testing
@@ -46,9 +50,9 @@ Validate runtime prerequisites without starting the loop.
 maxxair-fan check
 ```
 
-Checks Firebase connectivity, sensor path, IR directory, and `ir-ctl`. Exits `0` with `OK:` or `1` with `FAIL:` lines on stderr.
+This validates Firebase connectivity plus local sensor/`ir-ctl` **or** remote agent `/health` (hub-only AtomS3 / remote-Pi topologies skip local 1-wire and `ir-ctl`). Exits `0` with `OK:` or `1` with `FAIL:` lines on stderr.
 
-Run this after [Quickstart](quickstart.md) configuration and before enabling systemd.
+Run this after [Quickstart](quickstart.md) or [AtomS3 Lite](atoms3-agent.md) configuration and before enabling systemd.
 
 ## agent
 
@@ -64,7 +68,7 @@ maxxair-fan agent --bind 0.0.0.0 --port 8765
 | `--bind` | Bind address (default from `AGENT_BIND`) |
 | `--port` | Listen port (default from `AGENT_PORT`) |
 
-See [Topologies](topologies.md) for hub + remote Pi deployment.
+See [Topologies](topologies.md) for hub + remote Pi deployment. AtomS3 Lite units implement the same HTTP API; see [AtomS3 Lite agents](atoms3-agent.md).
 
 ## send-ir
 
@@ -75,7 +79,7 @@ maxxair-fan send-ir fan_off.ir
 maxxair-fan send-ir fan_on_in_50.ir
 ```
 
-Useful to verify hardware independently of the control loop. See [Troubleshooting → IR not working](troubleshooting.md#ir-not-working).
+Useful to verify **local** `ir-ctl` hardware independently of the control loop. For AtomS3 Lite IR, curl `POST /ir` as in [AtomS3 Lite agents](atoms3-agent.md). See [Troubleshooting → IR not working](troubleshooting.md#ir-not-working).
 
 ## simulate
 
