@@ -1,4 +1,4 @@
-"""HTTP client backend for remote Pi edge agents."""
+"""HTTP client backend for remote edge agents (Pi or AtomS3 Lite)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from maxxair_fan import config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TIMEOUT = 3
+DEFAULT_TIMEOUT = 5
 
 
 class RemoteAgentBackend:

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Added
+- AtomS3 Lite firmware (`firmware/atoms3-agent/`) implementing the remote-agent HTTP API for three MaxxAir fans
+- `scripts/ir_to_rmt.py` to compile `ir_codes/*.ir` into ESP32 PROGMEM raw timings
+- Hub example [`config/examples/hub-atoms3.json`](config/examples/hub-atoms3.json) and [AtomS3 Lite agent guide](docs/atoms3-agent.md)
+- Docs for hub + three AtomS3 Lite agents (README, topologies 2b, architecture, CLI, Firebase schema)
+
+### Changed
+- Remote agent HTTP timeout increased from 3s to 5s to cover DS18B20 conversion plus IR send
+
 ## [1.1.0] - 2026-05-25
 
 ### Added

@@ -47,6 +47,18 @@ ruff format .
 
 Details: [Development → Replay fixtures](docs/development.md#replay-fixtures).
 
+## AtomS3 Lite firmware
+
+Edge-agent firmware and IR conversion:
+
+```bash
+python3 scripts/ir_to_rmt.py
+# then, with PlatformIO and a board in download mode:
+# pio run -e fan1 -t upload
+```
+
+See [AtomS3 Lite agents](docs/atoms3-agent.md).
+
 ## Pull requests
 
 - Keep changes focused

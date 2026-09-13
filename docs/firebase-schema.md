@@ -1,8 +1,8 @@
 # Firebase Realtime Database Schema
 
-The Pi daemon reads user settings and writes status telemetry to a single RTDB node.
+The hub daemon reads user settings and writes status telemetry to a Firebase RTDB node per fan. AtomS3 Lite agents do not talk to Firebase.
 
-**Node path:** `fans/fan1` (override with `FAN_NODE` — see [Configuration](configuration.md#firebase))
+**Node path:** `fans/fan1` (override with `FAN_NODE`, or set one node per fan in `FANS_CONFIG` — see [Configuration](configuration.md#firebase) and [AtomS3 Lite agents](atoms3-agent.md)).
 
 ## Example document
 
@@ -32,9 +32,9 @@ These fields control fan behavior. Your mobile app or dashboard should write the
 | `targetTemp` | number | Desired temperature in °F |
 | `direction` | string | `"in"` (intake) or `"out"` (exhaust) |
 
-### Pi writes
+### Daemon writes
 
-The daemon updates these on each loop (subject to [write throttling](configuration.md#firebase-write-throttling)).
+The hub daemon updates these on each loop (subject to [write throttling](configuration.md#firebase-write-throttling)).
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -45,14 +45,14 @@ The daemon updates these on each loop (subject to [write throttling](configurati
 | `irOk` | boolean | `false` when last IR send attempt failed |
 | `lastIrCommand` | string | Last IR filename sent (e.g. `fan_on_in_40.ir`) |
 | `lastError` | string \| null | Human-readable error, or `null` when clear |
-| `sensorCrcFailures` | number | Cumulative DS18B20 CRC failures since daemon start |
+| `sensorCrcFailures` | number | Cumulative local DS18B20 CRC failures since daemon start (stays 0 for remote HTTP agents) |
 
 ## Read / write summary
 
 | Field | Written by |
 | --- | --- |
 | `targetTemp`, `direction` | User / app |
-| All other fields | Pi daemon |
+| All other fields | Hub daemon |
 
 ## Security rules
 
@@ -65,6 +65,14 @@ Sample rules allowing public read and authenticated write:
       "fan1": {
         ".read": true,
         ".write": "auth != null"
+      },
+      "fan2": {
+        ".read": true,
+        ".write": "auth != null"
+      },
+      "fan3": {
+        ".read": true,
+        ".write": "auth != null"
       }
     }
   }
@@ -73,14 +81,15 @@ Sample rules allowing public read and authenticated write:
 
 Adjust for your deployment:
 
-- The **Pi** needs write access (via legacy database secret or auth token)
+- The **hub** needs write access (via legacy database secret or auth token)
 - **Clients** need read access for telemetry and write access for `targetTemp` / `direction`
 - Restrict paths to the minimum required (e.g. per-fan nodes)
 
-The Pi authenticates with `FIREBASE_SECRET` using `?auth=` on REST requests. See [SECURITY.md](../SECURITY.md) for secret handling and migration notes.
+The hub authenticates with `FIREBASE_SECRET` using `?auth=` on REST requests. See [SECURITY.md](../SECURITY.md) for secret handling and migration notes.
 
 ## Related
 
 - [Configuration → Firebase](configuration.md#firebase)
 - [Architecture → Control loop](architecture.md#control-loop)
+- [AtomS3 Lite agents](atoms3-agent.md) — three-fan hub, agents do not write Firebase
 - [Troubleshooting → Firebase errors](troubleshooting.md#firebase-401--connection-errors)
