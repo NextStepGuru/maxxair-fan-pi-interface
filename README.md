@@ -2,7 +2,9 @@
 
 **Created by [Ryder Henry](https://github.com/NextStepGuru/maxxair-fan-pi-interface).**
 
-A thermostat daemon for MaxxAir roof vent fans. A hub process reads target temperature and direction from Firebase Realtime Database, computes fan speed with Ryder Henry's exponential curve, and sends IR commands — locally via `ir-ctl` on a Raspberry Pi, or over HTTP to remote agents (Raspberry Pi or [AtomS3 Lite](docs/atoms3-agent.md)).
+A thermostat daemon for MaxxAir roof vent fans, running on the coach's edge Raspberry Pi. The [coach Pi](docs/coach-network.md) (`192.168.10.126`) is the brain (Abbey: database and control). This Pi (`192.168.10.73`) handles local hardware: fan IR, the battery bank, and the USB-RS485 and USB-CAN adapters plugged into it.
+
+The fan hub reads target temperature and direction from Firebase Realtime Database, computes fan speed with Ryder Henry's exponential curve, and sends IR commands — locally via `ir-ctl` on a Raspberry Pi, or over HTTP to remote agents (Raspberry Pi or [AtomS3 Lite](docs/atoms3-agent.md)).
 
 ## Documentation
 
@@ -17,6 +19,7 @@ A thermostat daemon for MaxxAir roof vent fans. A hub process reads target tempe
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
 | [Development](docs/development.md) | Local dev without Pi hardware |
 | [Topologies](docs/topologies.md) | Single Pi, hub + remote, three AtomS3 Lite agents |
+| [Coach network](docs/coach-network.md) | Coach Pi is the brain; this Pi is the edge for fans, batteries, RS485, and CAN |
 | [AtomS3 Lite agents](docs/atoms3-agent.md) | Flash three Atoms as IR + DS18B20 edge agents |
 
 ## Quick start

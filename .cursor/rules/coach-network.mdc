@@ -1,0 +1,28 @@
+---
+description: Coach Pi is the brain; this Pi is the edge. Includes what is plugged in.
+alwaysApply: true
+---
+
+# Coach network
+
+Full write-up: `docs/coach-network.md`. Keep that page current when hardware or roles change.
+
+The coach Pi is the brain (database and control center). Abbey runs there. This Maxxair Pi is an edge node: it talks to local hardware and reports to the coach. Do not put the system of record on this Pi.
+
+| Role | Host | Address | Board |
+| --- | --- | --- | --- |
+| Brain — Abbey at `/coachproxy/home/pi/abbey-nextstepguru`, API port 3000 | `coachproxyos` | `192.168.10.126` | Pi 4, Debian 12 |
+| Edge — fans, batteries, RS485, CAN | `pi-4-48volt` | `192.168.10.73` | Pi 5, Debian 13 |
+
+Logins `deyoungjd`, `pi`, and `jeremy` share uid 1000 and one password on both Pis. Passwordless sudo. SSH keys work both ways and from the Mac (`ssh coachproxy`, `ssh maxxair`). Do not commit the password.
+
+The WattCycle pack is published to the coach MQTT broker as portal id `wattcycle48` (`N/wattcycle48/battery/1/...`). Abbey listens on that id. The Mac reaches `192.168.10.0/24` through WARP on and off the coach Wi-Fi (device profile Default, route on coach tunnel `abby-pi-01`). `ssh deyoungjd@192.168.10.126` and `ssh deyoungjd@192.168.10.73` are the commands. The rest of `192.168.0.0/16` stays excluded. `ssh coach-ssh` and `ssh maxxair-ssh` are the Access-gated hostname path (`coach-ssh.nextstepguru.com`, `maxxair-ssh.nextstepguru.com`). Do not publish port 22. Cloudflare Access allows `jeremy@nextstep.guru` before those hostname sessions reach the Pi.
+
+## Plugged in on 192.168.10.73 (2026-09-24)
+
+| Path | Device |
+| --- | --- |
+| `/dev/rs485` → `ttyUSB0` | DSD TECH SH-U10 USB-RS485, CP2102 `10c4:ea60`. Pins A+ B- GND. Opens; bus was silent. |
+| `/dev/canable` → `ttyACM0` | Jhoinrch RH-02 PLUS / CANable 2 USB-CAN FD, `16d0:117e`, slcan. Not RS232. `V\r` returns the CANable 2 git string. Cabled to a WattCycle WT48V100AH100RACK-3UBT. That pack's CAN/RS485 RJ45 is pin 4 CANH, pin 5 CANL, pin 6 GND. A 2026-09-24 listen at 500 kbit/s and 250 kbit/s got 0 frames and 0 bus errors. |
+
+Udev: `deploy/99-maxxair-usb.rules` (installed on the Pi). No DS18B20, no IR/`lirc`, no `can0` until `slcand` is started. `maxxair-fan` is not running on this Pi yet.
