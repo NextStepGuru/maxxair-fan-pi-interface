@@ -19,9 +19,9 @@ Firebase RTDB  <-->  hub: maxxair-fan run
 
 Identities (mDNS, port **8765**):
 
-- `http://maxxair-fan1.local:8765`
-- `http://maxxair-fan2.local:8765`
-- `http://maxxair-fan3.local:8765`
+- `http://simon-maxxair-fan.local:8765` (env `fan1`)
+- `http://alvin-maxxair-fan.local:8765` (env `fan2`)
+- `http://theodore-maxxair-fan.local:8765` (env `fan3`)
 
 Shared `AGENT_TOKEN` (or per-fan override in hub JSON). Deduping IR still happens on the hub; each Atom just plays the filename it is sent.
 
@@ -71,14 +71,14 @@ cp src/secrets.h.example src/secrets.h
 # edit WIFI_SSID, WIFI_PASSWORD, AGENT_TOKEN
 ```
 
-Same firmware image on all three units; only the PlatformIO env identity differs (`maxxair-fan1` / `fan2` / `fan3`).
+Same firmware image on all three units; only the PlatformIO env hostname differs.
 
 Put the Atom in download mode: hold reset about 2 seconds until the internal green LED lights, then release. USB Serial/JTAG — no CP2102 driver.
 
 ```bash
-pio run -e fan1 -t upload   # maxxair-fan1.local
-pio run -e fan2 -t upload   # maxxair-fan2.local
-pio run -e fan3 -t upload   # maxxair-fan3.local
+pio run -e fan1 -t upload   # simon-maxxair-fan
+pio run -e fan2 -t upload   # alvin-maxxair-fan
+pio run -e fan3 -t upload   # theodore-maxxair-fan
 ```
 
 `pio run` regenerates `src/ir_timings.h` from [`ir_codes/`](../ir_codes/) via [`scripts/ir_to_rmt.py`](../scripts/ir_to_rmt.py) (PROGMEM microsecond mark/space arrays, 40 kHz carrier). Regenerate by hand:
@@ -107,7 +107,7 @@ Manual IR check (aim at the fan first):
 curl -H "Authorization: Bearer your_shared_secret" \
   -H "Content-Type: application/json" \
   -d '{"filename":"fan_off.ir"}' \
-  http://maxxair-fan1.local:8765/ir
+  http://simon-maxxair-fan.local:8765/ir
 ```
 
 If mDNS fails, use the IP printed on the serial console.
@@ -130,9 +130,9 @@ Hub JSON:
 ```json
 {
   "fans": [
-    {"id": "fan1", "firebase_node": "fans/fan1", "agent_url": "http://maxxair-fan1.local:8765"},
-    {"id": "fan2", "firebase_node": "fans/fan2", "agent_url": "http://maxxair-fan2.local:8765"},
-    {"id": "fan3", "firebase_node": "fans/fan3", "agent_url": "http://maxxair-fan3.local:8765"}
+    {"id": "fan1", "firebase_node": "fans/fan1", "agent_url": "http://simon-maxxair-fan.local:8765"},
+    {"id": "fan2", "firebase_node": "fans/fan2", "agent_url": "http://alvin-maxxair-fan.local:8765"},
+    {"id": "fan3", "firebase_node": "fans/fan3", "agent_url": "http://theodore-maxxair-fan.local:8765"}
   ]
 }
 ```
