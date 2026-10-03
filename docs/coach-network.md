@@ -28,6 +28,7 @@ Other edge devices follow the same rule: talk to the coach Pi, do not become a s
 | Brain | `coachproxyos` | Raspberry Pi 4 Model B Rev 1.4 | Debian 12 (bookworm) | `192.168.10.126` (Ethernet; Wi-Fi is also `192.168.10.122`) | `ssh deyoungjd@192.168.10.126` or `ssh coachproxy` |
 | Edge | `pi-4-48volt` | Raspberry Pi 5 Model B Rev 1.1 | Debian 13 (trixie), kernel `6.18.50+rpt-rpi-2712` | `192.168.10.73` on Wi-Fi `old_devices_2g` | `ssh deyoungjd@192.168.10.73` or `ssh maxxair` |
 | Fan agent 1 | `simon-maxxair-fan` | M5Stack AtomS3 Lite (ESP32-S3, MAC `e8:f6:0a:98:fe:94`) | `firmware/atoms3-agent` env `fan1` | `192.168.10.224` (DHCP reservation) on Wi-Fi `old_devices_2g`, HTTP `:8765` | none |
+| Battery readers | `wattcycle-reader` a/b | 2× ESP32-S3 devkit N16R8 (board A `94:a9:90:d1:7a:b4` on ttyUSB0 packs 1-3, board B on ttyUSB1 packs 4-6, 12s stagger) | `firmware/wattcycle-reader` | USB on `pi-4-48volt` (power + flash), Wi-Fi `old_devices_2g`; publish `N/wattcycle48ble/battery/<1-6>/#` (six 48V WattCycle packs over BLE, per-pack 16-cell array) to the coach broker; see [README](../firmware/wattcycle-reader/README.md) | none |
 
 The Atoms need a 2.4 GHz network, so they join `old_devices_2g`. Use their IPs in the hub fans config. `.local` names do not resolve on the Pis: the DNS search domain turns them into `<name>.local.home.nextstep.guru`, which Cloudflare answers.
 
@@ -50,6 +51,26 @@ The Maxxair Pi reads the WattCycle BMS on `/dev/canable` (Pylontech PY, 500 kbit
 `N/wattcycle48/battery/1/Soc`
 
 That id is only this pack. Abbey subscribes to `N/wattcycle48/#` and puts the reading on the overview as `wattcycle`. The Victron GX batteries stay on their own portals.
+
+## WattCycle BLE rack (six 48V packs)
+
+Two ESP32-S3 boards (`firmware/wattcycle-reader`, envs `reader-a` packs 1-3 and
+`reader-b` packs 4-6) read bat01-bat06 over BLE and publish
+`N/wattcycle48ble/battery/<1-6>/#` to the coach broker, including the full
+16-cell voltage array per pack (`System/Cells`) and cell temps. Protocol and
+quirks are documented in the firmware [README](../firmware/wattcycle-reader/README.md).
+
+`wattcycle-ble-relay.service` ([unit](../deploy/wattcycle-ble-relay.service),
+[script](../deploy/wattcycle-ble-relay.py), installed at `~/wattcycle-relay/`
+on this Pi) republishes to the Cerbo broker: a bank aggregate on
+`wattcycle48ble/bank` (6 modules, 600Ah, bank SOC/voltage/current) plus
+per-pack objects on `wattcycle48ble/bat01..06`. On the Cerbo,
+`/data/etc/dbus-mqtt-battery-bank` (device instance 110) presents the bank as
+the single **WattCycle rack** battery; the per-pack driver instances
+(`/data/etc/dbus-mqtt-battery-bat01..06`) are parked (down files in
+`/service/...`) and can be re-enabled for per-pack drill-down. Abbey renders
+the rack with per-cell grids from the coach-broker topics
+(`wattcycleBle` in the overview).
 
 ## Remote SSH
 
