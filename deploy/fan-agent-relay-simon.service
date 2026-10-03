@@ -1,0 +1,14 @@
+[Unit]
+Description=TCP relay to simon AtomS3 fan agent (192.168.10.224:8765) for the coach Pi
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:18765,fork,reuseaddr,bind=192.168.10.73 TCP:192.168.10.224:8765
+Restart=always
+RestartSec=3
+User=nobody
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -7,9 +7,9 @@ One Atom per fan. Python on a hub still owns Firebase and the speed curve.
 ```bash
 cp src/secrets.h.example src/secrets.h   # WIFI_SSID, WIFI_PASSWORD, AGENT_TOKEN
 # download mode: hold reset ~2s until green LED
-pio run -e fan1 -t upload   # maxxair-fan1.local
-pio run -e fan2 -t upload
-pio run -e fan3 -t upload
+pio run -e fan1 -t upload   # simon-maxxair-fan
+pio run -e fan2 -t upload   # alvin-maxxair-fan
+pio run -e fan3 -t upload   # theodore-maxxair-fan
 ```
 
 Pins: IR GPIO 4, DS18B20 G5 (3.3 V + 4.7 kΩ pull-up), status WS2812C GPIO 35.
