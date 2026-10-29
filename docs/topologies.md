@@ -74,11 +74,11 @@ FANS_CONFIG=/home/pi/maxxair-fan-pi-interface/config/examples/hub-atoms3.json
 AGENT_TOKEN=your_shared_secret
 ```
 
-Flash identities `maxxair-fan1` / `fan2` / `fan3` so the hub URLs match:
+Flash envs `fan1` / `fan2` / `fan3` so the hub URLs match:
 
-- `http://maxxair-fan1.local:8765`
-- `http://maxxair-fan2.local:8765`
-- `http://maxxair-fan3.local:8765`
+- `http://simon-maxxair-fan.local:8765`
+- `http://alvin-maxxair-fan.local:8765`
+- `http://theodore-maxxair-fan.local:8765`
 
 See [`config/examples/hub-atoms3.json`](../config/examples/hub-atoms3.json) and [AtomS3 Lite agents](atoms3-agent.md) (wiring, download mode, IR range check).
 

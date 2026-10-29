@@ -179,17 +179,17 @@ For AtomS3 onboard IR, skip `ir-ctl` / `/dev/lirc0` and use [AtomS3 Lite agent](
 
 **Fixes**
 
-1. Confirm the unit joined Wi-Fi: serial console should print an IP and `http://maxxair-fanN.local:8765`. Orange LED means Wi-Fi is down.
+1. Confirm the unit joined Wi-Fi: serial console should print an IP and `http://<name>-maxxair-fan.local:8765`. Orange LED means Wi-Fi is down.
 
 2. Test the HTTP contract:
 
    ```bash
-   curl http://maxxair-fan1.local:8765/health
-   curl -H "Authorization: Bearer $AGENT_TOKEN" http://maxxair-fan1.local:8765/temp
+   curl http://simon-maxxair-fan.local:8765/health
+   curl -H "Authorization: Bearer $AGENT_TOKEN" http://simon-maxxair-fan.local:8765/temp
    curl -H "Authorization: Bearer $AGENT_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"filename":"fan_off.ir"}' \
-     http://maxxair-fan1.local:8765/ir
+     http://simon-maxxair-fan.local:8765/ir
    ```
 
 3. DS18B20 reads of −127 °C / 503: `pinMode(G5, INPUT)` must run after `M5.begin()`. Check 3.3 V power and the 4.7 kΩ pull-up to 3.3 V, not 5 V.

@@ -1,0 +1,5 @@
+# DSD TECH SH-U10 USB to RS485 (Silicon Labs CP2102) — Amazon B078X5H8H7
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="rs485", GROUP="dialout", MODE="0660"
+
+# Jhoinrch RH-02 PLUS USB to CAN FD (CANable 2.0, slcan) — Amazon B0F9F9J3WN
+SUBSYSTEM=="tty", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="117e", SYMLINK+="canable", GROUP="dialout", MODE="0660"

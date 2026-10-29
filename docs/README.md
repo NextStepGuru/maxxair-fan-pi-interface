@@ -14,6 +14,7 @@ Guides for installing, configuring, and developing the MaxxAir fan controller (l
 | [Troubleshooting](troubleshooting.md) | Common problems and how to fix them |
 | [Development](development.md) | Run locally without Pi hardware, replay fixtures, fake Firebase |
 | [Topologies](topologies.md) | Multi-fan deployments: single Pi, hub + remote Pi or AtomS3 Lite, multi-local |
+| [Coach network](coach-network.md) | Coach Pi (`192.168.10.126`) is the brain; this Pi reads RS485 and CAN and reports in |
 | [AtomS3 Lite agents](atoms3-agent.md) | Flash three AtomS3 Lite units as IR + DS18B20 edge agents |
 
 ## Other resources

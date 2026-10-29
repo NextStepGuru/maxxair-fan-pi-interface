@@ -1,0 +1,13 @@
+[Unit]
+Description=WattCycle BLE -> Cerbo battery relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/deyoungjd/.venvs/esptool/bin/python /home/deyoungjd/wattcycle-relay/wattcycle-ble-relay.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

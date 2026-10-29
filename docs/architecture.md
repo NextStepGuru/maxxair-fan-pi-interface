@@ -130,6 +130,7 @@ tests/             Unit and integration tests
 
 ## Related docs
 
+- [Coach network](coach-network.md) — coach Pi is the brain; this Pi is an edge node (fans, batteries, RS485, CAN)
 - [Topologies](topologies.md) — local Pi, hub + remote Pi, hub + AtomS3 Lite
 - [Firebase schema](firebase-schema.md) — fields written to RTDB
 - [CLI reference](cli.md) — run, check, simulate, replay

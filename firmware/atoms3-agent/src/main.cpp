@@ -1,7 +1,15 @@
+#ifndef DISABLE_CODE_FOR_RECEIVER
 #define DISABLE_CODE_FOR_RECEIVER
+#endif
+#ifndef NO_LED_FEEDBACK_CODE
 #define NO_LED_FEEDBACK_CODE
+#endif
+#ifndef NO_LED_SEND_FEEDBACK_CODE
 #define NO_LED_SEND_FEEDBACK_CODE
+#endif
+#ifndef SEND_PWM_BY_TIMER
 #define SEND_PWM_BY_TIMER
+#endif
 #ifndef IR_SEND_PIN
 #define IR_SEND_PIN 4
 #endif
@@ -25,7 +33,7 @@
 #include "ir_timings.h"
 
 #ifndef FAN_HOSTNAME
-#define FAN_HOSTNAME "maxxair-fan1"
+#define FAN_HOSTNAME "simon-maxxair-fan"
 #endif
 
 #ifndef AGENT_PORT
@@ -49,8 +57,14 @@ static OneWire oneWire(kOneWirePin);
 static DallasTemperature sensors(&oneWire);
 static Adafruit_NeoPixel statusLed(kLedCount, kLedPin, NEO_GRB + NEO_KHZ800);
 
+static const uint32_t kWifiBootTimeoutMs = 20000;
+static const uint32_t kWifiRetryMs = 10000;
+
 static uint32_t currentLedColor = 0;
 static bool sensorOk = false;
+static bool wifiWasConnected = false;
+static bool mdnsStarted = false;
+static uint32_t lastWifiRetry = 0;
 
 static void setLed(uint32_t color) {
   if (color == currentLedColor) {
@@ -210,20 +224,25 @@ static void handleButton() {
 static void connectWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(FAN_HOSTNAME);
+  WiFi.setAutoReconnect(true);
   setLed(kColorWifi);
   Serial.printf("Connecting to Wi-Fi as %s\n", FAN_HOSTNAME);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  uint32_t start = millis();
   uint32_t lastDot = 0;
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED && millis() - start < kWifiBootTimeoutMs) {
     M5.update();
+    handleButton();
     if (millis() - lastDot > 500) {
       Serial.print(".");
       lastDot = millis();
     }
     delay(50);
   }
-  Serial.printf("\nWi-Fi connected, IP %s\n", WiFi.localIP().toString().c_str());
-  setLed(kColorIdle);
+  Serial.println();
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Wi-Fi not connected yet; retrying in background");
+  }
 }
 
 static void startMdns() {
@@ -232,7 +251,31 @@ static void startMdns() {
     return;
   }
   MDNS.addService("http", "tcp", AGENT_PORT);
+  mdnsStarted = true;
   Serial.printf("mDNS http://%s.local:%d\n", FAN_HOSTNAME, AGENT_PORT);
+}
+
+static void maintainWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiWasConnected) {
+      wifiWasConnected = true;
+      Serial.printf("Wi-Fi connected, IP %s\n", WiFi.localIP().toString().c_str());
+      setLed(kColorIdle);
+      if (!mdnsStarted) {
+        startMdns();
+      }
+    }
+    return;
+  }
+  if (wifiWasConnected) {
+    wifiWasConnected = false;
+    Serial.println("Wi-Fi lost");
+  }
+  setLed(kColorWifi);
+  if (millis() - lastWifiRetry >= kWifiRetryMs) {
+    lastWifiRetry = millis();
+    WiFi.reconnect();
+  }
 }
 
 static void startHttp() {
@@ -256,24 +299,20 @@ void setup() {
   setLed(kColorBoot);
 
   pinMode(IR_SEND_PIN, OUTPUT);
-  IrSender.begin(DISABLE_LED_FEEDBACK);
-  IrSender.setSendPin(IR_SEND_PIN);
+  IrSender.begin();
 
   pinMode(kOneWirePin, INPUT);
   sensors.begin();
   sensors.setWaitForConversion(true);
 
   connectWifi();
-  startMdns();
   startHttp();
+  maintainWifi();
 }
 
 void loop() {
   M5.update();
   handleButton();
-  if (WiFi.status() != WL_CONNECTED) {
-    setLed(kColorWifi);
-    WiFi.reconnect();
-  }
+  maintainWifi();
   server.handleClient();
 }
